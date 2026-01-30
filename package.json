@@ -5,9 +5,9 @@
     "description": "MCP (Model Context Protocol) server for Unity Editor - enables AI assistants like Claude to interact with Unity projects through standardized tools for asset management, scene manipulation, component inspection, and autonomous development workflows.",
     "unity": "2021.3",
     "unityRelease": "0f1",
-    "documentationUrl": "https://github.com/YOUR_USERNAME/local-mcp-server#readme",
-    "changelogUrl": "https://github.com/YOUR_USERNAME/local-mcp-server/blob/main/CHANGELOG.md",
-    "licensesUrl": "https://github.com/YOUR_USERNAME/local-mcp-server/blob/main/LICENSE",
+    "documentationUrl": "https://github.com/caner-cc/local-mcp-server#readme",
+    "changelogUrl": "https://github.com/caner-cc/local-mcp-server/blob/main/CHANGELOG.md",
+    "licensesUrl": "https://github.com/caner-cc/local-mcp-server/blob/main/LICENSE",
     "dependencies": {
         "com.unity.nuget.newtonsoft-json": "3.0.0"
     },
@@ -23,7 +23,7 @@
     ],
     "author": {
         "name": "Local MCP Contributors",
-        "url": "https://github.com/YOUR_USERNAME/local-mcp-server"
+        "url": "https://github.com/caner-cc/local-mcp-server"
     },
     "type": "tool",
     "samples": [
