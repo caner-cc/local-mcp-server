@@ -51,13 +51,22 @@ The server is now running and listening for connections.
 
 ### Step 3: Connect Claude Code
 
+**Option A: Copy the mcp.json file (Recommended)**
+
+Copy `mcp.json` from the package folder to your Unity project root:
+```
+Packages/com.localmcp.server/mcp.json  →  YourProject/mcp.json
+```
+
+Claude Code will auto-discover the server when you open the project.
+
+**Option B: Manual registration**
+
 Open a terminal in your project directory and run:
 
 ```bash
 claude mcp add --transport http unity http://localhost:8090/mcp -s project
 ```
-
-This registers the Unity MCP server with Claude Code for this project.
 
 ### Step 4: Verify It Works
 
