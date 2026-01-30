@@ -24,7 +24,7 @@ MCP (Model Context Protocol) server for Unity Editor that enables AI assistants 
 4. Select `Add package from git URL...`
 5. Paste this URL and click Add:
    ```
-   https://github.com/caner-cc/local-mcp-server.git?path=com.localmcp.server
+   https://github.com/caner-cc/local-mcp-server.git
    ```
 
 **Option B: Edit manifest.json directly**
@@ -34,7 +34,7 @@ Open `YourProject/Packages/manifest.json` and add this line to the `dependencies
 ```json
 {
   "dependencies": {
-    "com.localmcp.server": "https://github.com/caner-cc/local-mcp-server.git?path=com.localmcp.server",
+    "com.localmcp.server": "https://github.com/caner-cc/local-mcp-server.git",
     ...
   }
 }
