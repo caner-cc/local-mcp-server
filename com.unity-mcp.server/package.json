@@ -1,0 +1,36 @@
+{
+    "name": "com.unity-mcp.server",
+    "version": "1.0.0",
+    "displayName": "Unity MCP Server",
+    "description": "MCP (Model Context Protocol) server for Unity Editor - enables AI assistants like Claude to interact with Unity projects through standardized tools for asset management, scene manipulation, component inspection, and autonomous development workflows.",
+    "unity": "2021.3",
+    "unityRelease": "0f1",
+    "documentationUrl": "https://github.com/YOUR_USERNAME/unity-mcp-server#readme",
+    "changelogUrl": "https://github.com/YOUR_USERNAME/unity-mcp-server/blob/main/CHANGELOG.md",
+    "licensesUrl": "https://github.com/YOUR_USERNAME/unity-mcp-server/blob/main/LICENSE",
+    "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.0.0"
+    },
+    "keywords": [
+        "mcp",
+        "ai",
+        "claude",
+        "editor",
+        "automation",
+        "tools",
+        "development",
+        "workflow"
+    ],
+    "author": {
+        "name": "Unity MCP Contributors",
+        "url": "https://github.com/YOUR_USERNAME/unity-mcp-server"
+    },
+    "type": "tool",
+    "samples": [
+        {
+            "displayName": "Custom Tool Example",
+            "description": "Shows how to create custom MCP tools in your project",
+            "path": "Samples~/CustomToolExample"
+        }
+    ]
+}
