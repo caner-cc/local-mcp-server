@@ -10,56 +10,82 @@ MCP (Model Context Protocol) server for Unity Editor that enables AI assistants 
 - **Extensible** - Add custom tools in your project with simple attributes
 - **Autonomous Development** - Write, modify, and delete scripts with compilation feedback
 
-## Installation
+---
 
-### Via Package Manager (Git URL)
+## Quick Start (5 minutes)
 
-1. Open Window > Package Manager
-2. Click `+` > Add package from git URL
-3. Enter: `https://github.com/YOUR_USERNAME/local-mcp-server.git?path=com.localmcp.server`
+### Step 1: Install the Package
 
-For private repositories, use SSH:
-```
-git@github.com:YOUR_USERNAME/local-mcp-server.git?path=com.localmcp.server
-```
+**Option A: Via Unity Package Manager (Recommended)**
 
-### Via manifest.json
+1. Open your Unity project
+2. Go to `Window > Package Manager`
+3. Click the `+` button in the top-left corner
+4. Select `Add package from git URL...`
+5. Paste this URL and click Add:
+   ```
+   https://github.com/caner-cc/local-mcp-server.git?path=com.localmcp.server
+   ```
 
-Add to your `Packages/manifest.json`:
+**Option B: Edit manifest.json directly**
+
+Open `YourProject/Packages/manifest.json` and add this line to the `dependencies` section:
+
 ```json
 {
   "dependencies": {
-    "com.localmcp.server": "https://github.com/YOUR_USERNAME/local-mcp-server.git?path=com.localmcp.server"
+    "com.localmcp.server": "https://github.com/caner-cc/local-mcp-server.git?path=com.localmcp.server",
+    ...
   }
 }
 ```
 
-## Quick Start
+Save the file. Unity will automatically download and install the package.
 
-### Enable the Server
+### Step 2: Enable the MCP Server
 
-1. In Unity: `Tools > MCP > Enable MCP Server`
-2. The server starts on port 8090 (fallback: 8091)
+1. In Unity, go to `Tools > MCP > Enable MCP Server`
+2. You should see a console message: `[MCP] Server started on port 8090`
 
-### Connect Claude Code
+The server is now running and listening for connections.
+
+### Step 3: Connect Claude Code
+
+Open a terminal in your project directory and run:
 
 ```bash
 claude mcp add --transport http unity http://localhost:8090/mcp -s project
 ```
 
-### Verify Connection
+This registers the Unity MCP server with Claude Code for this project.
 
-```bash
-# Check server health
-curl http://localhost:8090/heartbeat
+### Step 4: Verify It Works
 
-# List available tools
-curl -X POST http://localhost:8090/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+Start a Claude Code session and try:
+
+```
+"Use the editor_state tool to check Unity's current state"
 ```
 
-## Built-in Tools
+Claude should be able to query Unity and tell you if it's playing, paused, the current scene name, etc.
+
+---
+
+## What Can You Do With It?
+
+Once connected, Claude can:
+
+- **Find and inspect assets** - "Find all ScriptableObjects in Assets/Data"
+- **Create GameObjects** - "Create an empty GameObject called 'GameManager' at the origin"
+- **Add components** - "Add a Rigidbody to the Player object"
+- **Write scripts** - "Create a PlayerHealth.cs script with 100 max health"
+- **Control the editor** - "Enter play mode" / "Stop playing"
+- **Read console logs** - "Show me the last 10 error messages"
+- **Navigate the scene** - "Frame the MainCamera in the scene view"
+
+---
+
+## Built-in Tools Reference
 
 ### Asset Operations
 | Tool | Description |
@@ -115,6 +141,8 @@ curl -X POST http://localhost:8090/mcp \
 | `console_clear` | Clear console |
 | `mcp_health` | Server diagnostics |
 
+---
+
 ## Creating Custom Tools
 
 Add custom tools to your project by creating classes with `[MCPTool]` attributes:
@@ -149,9 +177,11 @@ Tools are auto-discovered via reflection. Your assembly must reference `LocalMCP
 3. Expand "Samples"
 4. Click "Import" next to "Custom Tool Example"
 
+---
+
 ## Configuration
 
-### Server Settings
+### MCP Control Panel
 
 Access via `Tools > MCP > Control Panel`:
 - Enable/disable server
@@ -167,13 +197,31 @@ Access via `Tools > MCP > Control Panel`:
 | `LocalMCP_Port` | 8090 | Server port |
 | `LocalMCP_ShowToolbar` | false | Show scene view toolbar |
 
-## WSL2 Usage
+---
 
-If running Claude from WSL2, use PowerShell as a bridge:
+## Troubleshooting
+
+### Server won't start
+- Check if port 8090/8091 is already in use
+- Try `Tools > MCP > Force Stop MCP (Emergency)` then re-enable
+
+### Tools not appearing
+- Run `Tools > MCP > Refresh Tool Registry`
+- Check for compilation errors in the Console
+
+### Claude can't connect
+- Make sure the server is enabled (check `Tools > MCP > Control Panel`)
+- Verify the port: `curl http://localhost:8090/heartbeat`
+- Re-register: `claude mcp remove unity -s project` then add again
+
+### WSL2 can't connect
+Windows localhost is not accessible from WSL2. Use PowerShell as a bridge:
 
 ```bash
 powershell.exe -Command "Invoke-WebRequest -Uri 'http://localhost:8090/mcp' -Method POST -ContentType 'application/json' -Body '{...}' -TimeoutSec 30 -UseBasicParsing | Select-Object -ExpandProperty Content"
 ```
+
+---
 
 ## Requirements
 
@@ -183,24 +231,3 @@ powershell.exe -Command "Invoke-WebRequest -Uri 'http://localhost:8090/mcp' -Met
 ## License
 
 MIT License - see LICENSE file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## Troubleshooting
-
-### Server won't start
-- Check if port 8090/8091 is in use
-- Try `Tools > MCP > Force Stop MCP (Emergency)` then re-enable
-
-### Tools not appearing
-- Run `Tools > MCP > Refresh Tool Registry`
-- Check for compilation errors
-
-### WSL2 can't connect
-- Windows localhost is not accessible from WSL2
-- Use the PowerShell bridge method described above
