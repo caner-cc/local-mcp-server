@@ -60,7 +60,7 @@ namespace LocalMCP.Tools
             var path = args["path"]?.ToString();
             var summary = args["summary"]?.ToObject<bool>() ?? true; // Default to summary
             var maxFields = args["maxFields"]?.ToObject<int>() ?? 15;
-
+            
             if (string.IsNullOrEmpty(path))
             {
                 return new { success = false, message = "Path required" };
@@ -94,7 +94,7 @@ namespace LocalMCP.Tools
                     .Select(c => c.GetType().Name)
                     .ToArray();
                 info["childCount"] = prefab.transform.childCount;
-
+                
                 if (!summary)
                 {
                     // Include children names
@@ -107,13 +107,13 @@ namespace LocalMCP.Tools
                         children.Add($"... and {prefab.transform.childCount - 20} more");
                     info["children"] = children;
                 }
-
+                
                 info["hint"] = "Use object_dump or component_inspect for detailed component data";
             }
             else if (asset is ScriptableObject so)
             {
                 info["isScriptableObject"] = true;
-
+                
                 if (summary)
                 {
                     // Just list field names in summary mode
@@ -140,14 +140,14 @@ namespace LocalMCP.Tools
                     var prop = serializedObj.GetIterator();
                     int fieldCount = 0;
                     int totalFields = 0;
-
+                    
                     if (prop.NextVisible(true))
                     {
                         do
                         {
                             if (prop.name == "m_Script") continue;
                             totalFields++;
-
+                            
                             if (fieldCount < maxFields)
                             {
                                 fields[prop.name] = GetPropertyValue(prop);
@@ -284,39 +284,6 @@ namespace LocalMCP.Tools
             }
 
             return new { success = true, message = $"Moved to: {to}" };
-        }
-
-        [MCPTool("asset_dependencies", "Get asset dependencies", Category = "Assets", IsReadOnly = true)]
-        [MCPParam("path", "string", "Asset path")]
-        [MCPParam("recursive", "boolean", "Include recursive dependencies (default: false)", false)]
-        public static object AssetDependencies(JObject args)
-        {
-            var path = args["path"]?.ToString();
-            var recursive = args["recursive"]?.ToObject<bool>() ?? false;
-
-            if (string.IsNullOrEmpty(path))
-            {
-                return new { success = false, message = "Path required" };
-            }
-
-            var deps = AssetDatabase.GetDependencies(path, recursive);
-            var results = deps
-                .Where(d => d != path)
-                .Select(d => new
-                {
-                    path = d,
-                    type = AssetDatabase.GetMainAssetTypeAtPath(d)?.Name ?? "Unknown"
-                })
-                .ToArray();
-
-            return new
-            {
-                success = true,
-                path,
-                recursive,
-                count = results.Length,
-                dependencies = results
-            };
         }
 
         [MCPTool("prefab_instantiate", "Instantiate a prefab in the scene", Category = "Assets")]
@@ -462,27 +429,6 @@ namespace LocalMCP.Tools
             {
                 return new { success = false, message = $"Failed to modify property: {e.Message}" };
             }
-        }
-
-        [MCPTool("cache_stats", "Get asset cache statistics", Category = "Assets", IsReadOnly = true)]
-        public static object CacheStats(JObject args)
-        {
-            return AssetCache.Instance.GetStats();
-        }
-
-        [MCPTool("cache_refresh", "Force refresh the asset cache", Category = "Assets")]
-        public static object CacheRefresh(JObject args)
-        {
-            var startTime = DateTime.Now;
-            AssetCache.Instance.ForceRefresh();
-            var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
-
-            return new
-            {
-                success = true,
-                message = "Asset cache refreshed",
-                elapsedMs = elapsed
-            };
         }
 
         private static void SetPropertyValue(SerializedProperty prop, JToken value)

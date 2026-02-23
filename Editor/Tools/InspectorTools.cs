@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -8,87 +9,10 @@ using UnityEngine;
 namespace LocalMCP.Tools
 {
     /// <summary>
-    /// Tools for inspecting and modifying components.
+    /// Tools for inspecting components and their properties.
     /// </summary>
     public static class InspectorTools
     {
-        [MCPTool("component_add", "Add a component to a GameObject")]
-        [MCPParam("path", "string", "Hierarchy path to the GameObject")]
-        [MCPParam("component", "string", "Component type name (e.g., 'Rigidbody', 'BoxCollider')")]
-        public static object ComponentAdd(JObject args)
-        {
-            var path = args["path"]?.ToString();
-            var componentName = args["component"]?.ToString();
-
-            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(componentName))
-            {
-                return new { success = false, message = "Path and component required" };
-            }
-
-            var go = GameObject.Find(path);
-            if (go == null)
-            {
-                return new { success = false, message = $"GameObject not found: {path}" };
-            }
-
-            // Find the component type
-            Type componentType = null;
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                componentType = assembly.GetTypes()
-                    .FirstOrDefault(t => t.Name == componentName && typeof(Component).IsAssignableFrom(t));
-                if (componentType != null) break;
-            }
-
-            if (componentType == null)
-            {
-                return new { success = false, message = $"Component type not found: {componentName}" };
-            }
-
-            var component = Undo.AddComponent(go, componentType);
-            return new
-            {
-                success = component != null,
-                message = component != null ? $"Added {componentName} to {go.name}" : "Failed to add component"
-            };
-        }
-
-        [MCPTool("component_remove", "Remove a component from a GameObject")]
-        [MCPParam("path", "string", "Hierarchy path to the GameObject")]
-        [MCPParam("component", "string", "Component type name to remove")]
-        public static object ComponentRemove(JObject args)
-        {
-            var path = args["path"]?.ToString();
-            var componentName = args["component"]?.ToString();
-
-            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(componentName))
-            {
-                return new { success = false, message = "Path and component required" };
-            }
-
-            var go = GameObject.Find(path);
-            if (go == null)
-            {
-                return new { success = false, message = $"GameObject not found: {path}" };
-            }
-
-            var component = go.GetComponents<Component>()
-                .FirstOrDefault(c => c != null && c.GetType().Name == componentName);
-
-            if (component == null)
-            {
-                return new { success = false, message = $"Component not found: {componentName}" };
-            }
-
-            if (component is Transform)
-            {
-                return new { success = false, message = "Cannot remove Transform component" };
-            }
-
-            Undo.DestroyObjectImmediate(component);
-            return new { success = true, message = $"Removed {componentName} from {go.name}" };
-        }
-
         [MCPTool("component_inspect", "Get serialized fields and values from a component")]
         [MCPParam("path", "string", "Hierarchy path to the GameObject")]
         [MCPParam("component", "string", "Component type name to inspect")]
@@ -132,13 +56,13 @@ namespace LocalMCP.Tools
                 do
                 {
                     if (prop.name == "m_Script") continue;
-
+                    
                     // Skip private fields (starting with m_) unless requested
                     if (!includePrivate && prop.name.StartsWith("m_") && prop.name != "m_Name")
                         continue;
-
+                    
                     totalFields++;
-
+                    
                     if (fieldCount < maxFields)
                     {
                         fields[prop.name] = GetPropertyValueDetailed(prop);
@@ -229,7 +153,7 @@ namespace LocalMCP.Tools
             var path = args["path"]?.ToString();
             var summary = args["summary"]?.ToObject<bool>() ?? true; // Default to summary mode
             var maxFieldsPerComponent = args["maxFieldsPerComponent"]?.ToObject<int>() ?? 10;
-
+            
             if (string.IsNullOrEmpty(path))
             {
                 return new { success = false, message = "Path required" };
@@ -273,7 +197,7 @@ namespace LocalMCP.Tools
                         {
                             if (prop.name == "m_Script") continue;
                             if (prop.name.StartsWith("m_")) continue; // Skip internal fields
-
+                            
                             if (fieldCount < maxFieldsPerComponent)
                             {
                                 fields[prop.name] = GetPropertyValueDetailed(prop);
@@ -481,6 +405,10 @@ namespace LocalMCP.Tools
                     );
                     break;
                 case SerializedPropertyType.ObjectReference:
+                    // Support setting by:
+                    // 1. null - clear the reference
+                    // 2. string - asset path for ScriptableObjects/Prefabs
+                    // 3. object with gameObjectPath + componentType - for scene component references
                     if (value == null || value.Type == JTokenType.Null)
                     {
                         prop.objectReferenceValue = null;
@@ -492,6 +420,35 @@ namespace LocalMCP.Tools
                         if (asset == null)
                             throw new Exception($"Asset not found: {assetPath}");
                         prop.objectReferenceValue = asset;
+                    }
+                    else if (value.Type == JTokenType.Object)
+                    {
+                        var obj = value as JObject;
+                        var goPath = obj?["gameObjectPath"]?.ToString();
+                        var compType = obj?["componentType"]?.ToString();
+                        
+                        if (!string.IsNullOrEmpty(goPath) && !string.IsNullOrEmpty(compType))
+                        {
+                            // Scene component reference
+                            var targetGo = GameObject.Find(goPath);
+                            if (targetGo == null)
+                                throw new Exception($"GameObject not found: {goPath}");
+                            
+                            var targetComp = targetGo.GetComponents<Component>()
+                                .FirstOrDefault(c => c != null && c.GetType().Name == compType);
+                            if (targetComp == null)
+                                throw new Exception($"Component '{compType}' not found on '{goPath}'");
+                            
+                            prop.objectReferenceValue = targetComp;
+                        }
+                        else
+                        {
+                            throw new Exception("Object must have 'gameObjectPath' and 'componentType' for scene references");
+                        }
+                    }
+                    else
+                    {
+                        throw new Exception("ObjectReference must be: null, asset path string, or {gameObjectPath, componentType}");
                     }
                     break;
                 default:
@@ -509,6 +466,158 @@ namespace LocalMCP.Tools
                 parent = parent.parent;
             }
             return path;
+        }
+
+        [MCPTool("prefab_set_property", "Set a property on a component inside a prefab asset")]
+        [MCPParam("prefabPath", "string", "Asset path to the prefab (e.g., 'Assets/Prefabs/UI/MainUICanvas.prefab')")]
+        [MCPParam("objectPath", "string", "Path to child object within prefab (e.g., 'HUDPanel/TargetFrame'), or empty for root")]
+        [MCPParam("component", "string", "Component type name (e.g., 'Image')")]
+        [MCPParam("field", "string", "Field name to set (e.g., 'm_Sprite', 'm_Color')")]
+        [MCPParam("value", "any", "Value to set - for sprites use asset path string")]
+        public static object PrefabSetProperty(JObject args)
+        {
+            var prefabPath = args["prefabPath"]?.ToString();
+            var objectPath = args["objectPath"]?.ToString() ?? "";
+            var componentName = args["component"]?.ToString();
+            var fieldName = args["field"]?.ToString();
+            var value = args["value"];
+
+            if (string.IsNullOrEmpty(prefabPath) || string.IsNullOrEmpty(componentName) || string.IsNullOrEmpty(fieldName))
+            {
+                return new { success = false, message = "prefabPath, component, and field are required" };
+            }
+
+            // Load the prefab asset
+            var prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefabAsset == null)
+            {
+                return new { success = false, message = $"Prefab not found: {prefabPath}" };
+            }
+
+            // Open prefab for editing
+            var prefabRoot = PrefabUtility.LoadPrefabContents(prefabPath);
+            if (prefabRoot == null)
+            {
+                return new { success = false, message = $"Failed to load prefab contents: {prefabPath}" };
+            }
+
+            try
+            {
+                // Find the target object within the prefab
+                GameObject targetGO;
+                if (string.IsNullOrEmpty(objectPath))
+                {
+                    targetGO = prefabRoot;
+                }
+                else
+                {
+                    var targetTransform = prefabRoot.transform.Find(objectPath);
+                    if (targetTransform == null)
+                    {
+                        PrefabUtility.UnloadPrefabContents(prefabRoot);
+                        return new { success = false, message = $"Object not found in prefab: {objectPath}" };
+                    }
+                    targetGO = targetTransform.gameObject;
+                }
+
+                // Find the component
+                var component = targetGO.GetComponents<Component>()
+                    .FirstOrDefault(c => c != null && c.GetType().Name == componentName);
+
+                if (component == null)
+                {
+                    PrefabUtility.UnloadPrefabContents(prefabRoot);
+                    return new { success = false, message = $"Component not found: {componentName} on {objectPath}" };
+                }
+
+                // Get serialized object and property
+                var serializedObj = new SerializedObject(component);
+                var prop = serializedObj.FindProperty(fieldName);
+
+                if (prop == null)
+                {
+                    PrefabUtility.UnloadPrefabContents(prefabRoot);
+                    return new { success = false, message = $"Field not found: {fieldName}" };
+                }
+
+                // Set the value
+                SetPropertyValue(prop, value);
+                serializedObj.ApplyModifiedPropertiesWithoutUndo();
+
+                // Save the prefab
+                PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
+                PrefabUtility.UnloadPrefabContents(prefabRoot);
+
+                // Refresh to pick up changes
+                AssetDatabase.Refresh();
+
+                return new
+                {
+                    success = true,
+                    message = $"Set {componentName}.{fieldName} on {(string.IsNullOrEmpty(objectPath) ? "root" : objectPath)} in {prefabPath}"
+                };
+            }
+            catch (Exception e)
+            {
+                PrefabUtility.UnloadPrefabContents(prefabRoot);
+                return new { success = false, message = $"Failed to set property: {e.Message}" };
+            }
+        }
+
+        [MCPTool("prefab_get_hierarchy", "Get the hierarchy structure of a prefab asset")]
+        [MCPParam("prefabPath", "string", "Asset path to the prefab")]
+        [MCPParam("maxDepth", "integer", "Maximum depth to traverse (default: 5)", false)]
+        public static object PrefabGetHierarchy(JObject args)
+        {
+            var prefabPath = args["prefabPath"]?.ToString();
+            var maxDepth = args["maxDepth"]?.ToObject<int>() ?? 5;
+
+            if (string.IsNullOrEmpty(prefabPath))
+            {
+                return new { success = false, message = "prefabPath is required" };
+            }
+
+            var prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefabAsset == null)
+            {
+                return new { success = false, message = $"Prefab not found: {prefabPath}" };
+            }
+
+            var tree = BuildPrefabTree(prefabAsset.transform, "", maxDepth, 0);
+
+            return new
+            {
+                success = true,
+                prefabPath,
+                name = prefabAsset.name,
+                tree
+            };
+        }
+
+        private static object BuildPrefabTree(Transform t, string currentPath, int maxDepth, int depth)
+        {
+            var components = t.GetComponents<Component>()
+                .Where(c => c != null)
+                .Select(c => c.GetType().Name)
+                .ToList();
+
+            var children = new List<object>();
+            if (depth < maxDepth)
+            {
+                foreach (Transform child in t)
+                {
+                    var childPath = string.IsNullOrEmpty(currentPath) ? child.name : $"{currentPath}/{child.name}";
+                    children.Add(BuildPrefabTree(child, childPath, maxDepth, depth + 1));
+                }
+            }
+
+            return new
+            {
+                name = t.name,
+                path = currentPath,
+                components,
+                children = children.Count > 0 ? children : null
+            };
         }
     }
 }

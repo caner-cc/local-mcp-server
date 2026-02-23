@@ -10,9 +10,9 @@ namespace LocalMCP
     /// Toolbar overlay showing unified MCP server status.
     /// </summary>
     [Overlay(typeof(SceneView), "MCP Status", true)]
-    public class MCPToolbarOverlay : ToolbarOverlay
+    public class LocalMCPToolbarOverlay : ToolbarOverlay
     {
-        public MCPToolbarOverlay() : base(
+        public LocalMCPToolbarOverlay() : base(
             MCPStatusButton.ID
         )
         { }
@@ -24,7 +24,7 @@ namespace LocalMCP
     [EditorToolbarElement(ID, typeof(SceneView))]
     public class MCPStatusButton : EditorToolbarButton
     {
-        public const string ID = "LocalMCP/StatusButton";
+        public const string ID = "MCP/StatusButton";
 
         private static readonly Color RunningColor = new(0.2f, 0.8f, 0.3f);
         private static readonly Color StoppedColor = new(0.8f, 0.3f, 0.2f);
@@ -46,7 +46,7 @@ namespace LocalMCP
 
         private void UpdateStatus()
         {
-            bool running = MCPServer.IsRunning;
+            bool running = LocalMCPServer.IsRunning;
 
             if (EditorApplication.isCompiling)
             {
@@ -55,7 +55,7 @@ namespace LocalMCP
             }
             else if (running)
             {
-                text = $"MCP: {MCPServer.ToolCount} tools";
+                text = $"MCP: {LocalMCPServer.ToolCount} tools";
                 style.color = RunningColor;
             }
             else
@@ -112,7 +112,7 @@ namespace LocalMCP
             float width = 180;
 
             // Get server state
-            bool running = MCPServer.IsRunning;
+            bool running = LocalMCPServer.IsRunning;
             bool isCompiling = EditorApplication.isCompiling;
 
             // Background
@@ -121,14 +121,14 @@ namespace LocalMCP
 
             // MCP row
             Rect row = new Rect(margin + 4, margin + 4, width - 8, rowHeight);
-            DrawServerRow(row, "MCP", 8090, MCPServer.ToolCount, running, isCompiling, () =>
+            DrawServerRow(row, "MCP", 8090, LocalMCPServer.ToolCount, running, isCompiling, () =>
             {
                 if (running)
-                    MCPServer.Stop();
+                    LocalMCPServer.Stop();
                 else
                 {
                     MCPToolRegistry.Refresh();
-                    MCPServer.Start();
+                    LocalMCPServer.Start();
                 }
             });
 

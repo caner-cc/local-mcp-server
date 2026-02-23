@@ -199,17 +199,17 @@ namespace LocalMCP
             AssetDatabase.Refresh(ImportAssetOptions.Default);
         }
 
-        [MenuItem("Tools/MCP/Toggle Auto-Refresh Watcher")]
+        [MenuItem("Tools/LocalMCP/Toggle Auto-Refresh Watcher")]
         private static void ToggleAutoRefresh()
         {
             IsEnabled = !IsEnabled;
             Debug.Log($"[LocalMCP] Auto-refresh watcher: {(IsEnabled ? "enabled" : "disabled")}");
         }
 
-        [MenuItem("Tools/MCP/Toggle Auto-Refresh Watcher", true)]
+        [MenuItem("Tools/LocalMCP/Toggle Auto-Refresh Watcher", true)]
         private static bool ToggleAutoRefreshValidate()
         {
-            Menu.SetChecked("Tools/MCP/Toggle Auto-Refresh Watcher", IsEnabled);
+            Menu.SetChecked("Tools/LocalMCP/Toggle Auto-Refresh Watcher", IsEnabled);
             return true;
         }
     }

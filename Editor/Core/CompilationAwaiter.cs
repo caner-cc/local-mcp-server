@@ -7,13 +7,13 @@ namespace LocalMCP
 {
     /// <summary>
     /// Compilation awaiter that provides both synchronous and event-based waiting.
-    ///
+    /// 
     /// IMPORTANT: The synchronous version uses polling with short sleeps.
     /// This is necessary because:
     /// 1. Unity's compilation events fire on the main thread
     /// 2. Blocking the main thread with .GetAwaiter().GetResult() causes deadlocks
     /// 3. We can't use async/await in synchronous tool handlers
-    ///
+    /// 
     /// The polling approach is safe because:
     /// - It doesn't block Unity's message pump
     /// - Short sleep intervals (50ms) provide responsive detection
@@ -64,7 +64,7 @@ namespace LocalMCP
             {
                 _compilationFinished = true;
                 _compilationSucceeded = !EditorUtility.scriptCompilationFailed;
-
+                
                 if (!_compilationSucceeded && string.IsNullOrEmpty(_lastError))
                 {
                     _lastError = "Compilation failed - check Unity Console for details";
@@ -97,7 +97,7 @@ namespace LocalMCP
         /// <summary>
         /// Wait for compilation to complete synchronously.
         /// Uses polling with short sleeps to avoid deadlocks.
-        ///
+        /// 
         /// This is safe to call from MCP tool handlers.
         /// </summary>
         /// <param name="timeoutMs">Maximum time to wait in milliseconds</param>
@@ -105,16 +105,16 @@ namespace LocalMCP
         public CompilationResult WaitForCompilationSync(int timeoutMs = 30000)
         {
             var startTime = DateTime.Now;
-
+            
             // Quick check: if not compiling and no pending refresh, return immediately
             if (!EditorApplication.isCompiling)
             {
                 // Trigger a refresh to detect any pending changes
                 AssetDatabase.Refresh();
-
+                
                 // Brief wait to see if compilation starts
                 Thread.Sleep(100);
-
+                
                 if (!EditorApplication.isCompiling)
                 {
                     // No compilation needed
@@ -167,7 +167,7 @@ namespace LocalMCP
             bool success;
             string error;
             int errorCount, warningCount;
-
+            
             lock (_lock)
             {
                 success = _compilationSucceeded || !EditorUtility.scriptCompilationFailed;

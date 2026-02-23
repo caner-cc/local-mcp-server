@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEditor.Compilation;
@@ -191,9 +193,9 @@ namespace LocalMCP.Tools
                 success = true,
                 mcp = new
                 {
-                    serverRunning = MCPServer.IsRunning,
-                    port = MCPServer.Port,
-                    toolCount = MCPServer.ToolCount
+                    serverRunning = LocalMCPServer.IsRunning,
+                    port = LocalMCPServer.Port,
+                    toolCount = LocalMCPServer.ToolCount
                 },
                 unity = new
                 {
@@ -261,7 +263,7 @@ namespace LocalMCP.Tools
                 message = "Unity is ready for operations",
                 hasCompilationErrors = hasErrors,
                 waitedMs = result.WaitedMs,
-                serverRunning = MCPServer.IsRunning
+                serverRunning = LocalMCPServer.IsRunning
             };
         }
 
@@ -431,6 +433,56 @@ namespace LocalMCP.Tools
             {
                 return new { success = false, error = $"Failed to modify script: {e.Message}" };
             }
+        }
+
+        [MCPTool("mcp_categories", "List or toggle MCP tool categories. Disabled categories reduce token usage.", Category = "General")]
+        [MCPParam("enable", "string", "Category name to enable (optional)", false)]
+        [MCPParam("disable", "string", "Category name to disable (optional)", false)]
+        public static object MCPCategories(JObject args)
+        {
+            var enableCat = args["enable"]?.ToString();
+            var disableCat = args["disable"]?.ToString();
+
+            // Enable/disable if requested
+            if (!string.IsNullOrEmpty(enableCat))
+            {
+                MCPToolRegistry.SetCategoryEnabled(enableCat, true);
+            }
+
+            if (!string.IsNullOrEmpty(disableCat))
+            {
+                MCPToolRegistry.SetCategoryEnabled(disableCat, false);
+            }
+
+            // Return current state
+            var categories = MCPToolRegistry.GetCategories();
+            var counts = MCPToolRegistry.GetCategoryCounts();
+
+            var categoryList = categories.Select(kvp => new
+            {
+                name = kvp.Key,
+                enabled = kvp.Value,
+                toolCount = counts.TryGetValue(kvp.Key, out var c) ? c : 0
+            }).OrderBy(c => c.name).ToArray();
+
+            int enabledTools = categoryList.Where(c => c.enabled).Sum(c => c.toolCount);
+            int totalTools = categoryList.Sum(c => c.toolCount);
+
+            return new
+            {
+                success = true,
+                message = !string.IsNullOrEmpty(enableCat) || !string.IsNullOrEmpty(disableCat)
+                    ? "Category settings updated. Restart MCP client to see changes."
+                    : "Current category settings",
+                categories = categoryList,
+                summary = new
+                {
+                    enabledTools,
+                    totalTools,
+                    disabledTools = totalTools - enabledTools
+                },
+                hint = "Use enable/disable params to toggle. Restart MCP client after changes."
+            };
         }
     }
 }

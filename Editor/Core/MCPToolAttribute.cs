@@ -11,19 +11,19 @@ namespace LocalMCP
     {
         public string Name { get; }
         public string Description { get; }
-
+        
         /// <summary>
         /// Timeout in milliseconds for this tool. Default is 30000 (30 seconds).
         /// Set to 0 for no timeout (use with caution).
         /// </summary>
         public int TimeoutMs { get; set; } = 30000;
-
+        
         /// <summary>
         /// If true, this tool only reads data and can be cached/parallelized.
         /// If false, this tool modifies state and must run on main thread.
         /// </summary>
         public bool IsReadOnly { get; set; } = false;
-
+        
         /// <summary>
         /// Category for organizing tools in the UI. e.g., "Assets", "Scene", "Debug"
         /// </summary>

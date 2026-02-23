@@ -104,7 +104,7 @@ namespace LocalMCP.Tools
             var searchPath = args["path"]?.ToString();
             var maxObjects = args["maxObjects"]?.ToObject<int>() ?? 500;
             maxObjects = Math.Min(maxObjects, 2000); // Hard limit
-
+            
             GameObject[] objects;
             bool truncated = false;
 
@@ -142,7 +142,7 @@ namespace LocalMCP.Tools
                     truncated = true;
                     break;
                 }
-
+                
                 foreach (var component in go.GetComponents<Component>())
                 {
                     if (component == null)

@@ -5,41 +5,41 @@ using UnityEngine;
 namespace LocalMCP
 {
     /// <summary>
-    /// EditorWindow for controlling the MCP server.
+    /// EditorWindow for controlling the LocalMCP server.
     /// </summary>
-    public class MCPServerWindow : EditorWindow
+    public class LocalMCPWindow : EditorWindow
     {
         private int _port = 8090;
         private Vector2 _toolsScroll;
         private bool _showTools = true;
         private string _toolFilter = "";
 
-        [MenuItem("Tools/MCP/Server Window", priority = 100)]
+        [MenuItem("Tools/LocalMCP/Server Window", priority = 100)]
         public static void ShowWindow()
         {
-            var window = GetWindow<MCPServerWindow>("MCP Server");
+            var window = GetWindow<LocalMCPWindow>("LocalMCP");
             window.minSize = new Vector2(320, 400);
         }
 
-        [MenuItem("Tools/MCP/Start Server", priority = 200)]
+        [MenuItem("Tools/LocalMCP/Start Server", priority = 200)]
         public static void StartServer()
         {
-            MCPServer.Start(EditorPrefs.GetInt("LocalMCP_Port", 8090));
+            LocalMCPServer.Start(EditorPrefs.GetInt("LocalMCP_Port", 8090));
         }
 
-        [MenuItem("Tools/MCP/Stop Server", priority = 201)]
+        [MenuItem("Tools/LocalMCP/Stop Server", priority = 201)]
         public static void StopServer()
         {
-            MCPServer.Stop();
+            LocalMCPServer.Stop();
         }
 
-        [MenuItem("Tools/MCP/Restart Server", priority = 202)]
+        [MenuItem("Tools/LocalMCP/Restart Server", priority = 202)]
         public static void RestartServer()
         {
-            MCPServer.Restart();
+            LocalMCPServer.Restart();
         }
 
-        [MenuItem("Tools/MCP/Refresh Tools", priority = 300)]
+        [MenuItem("Tools/LocalMCP/Refresh Tools", priority = 300)]
         public static void RefreshTools()
         {
             MCPToolRegistry.Refresh();
@@ -49,15 +49,15 @@ namespace LocalMCP
         private void OnEnable()
         {
             _port = EditorPrefs.GetInt("LocalMCP_Port", 8090);
-            MCPServer.OnServerStarted += Repaint;
-            MCPServer.OnServerStopped += Repaint;
+            LocalMCPServer.OnServerStarted += Repaint;
+            LocalMCPServer.OnServerStopped += Repaint;
             EditorApplication.update += RepaintIfNeeded;
         }
 
         private void OnDisable()
         {
-            MCPServer.OnServerStarted -= Repaint;
-            MCPServer.OnServerStopped -= Repaint;
+            LocalMCPServer.OnServerStarted -= Repaint;
+            LocalMCPServer.OnServerStopped -= Repaint;
             EditorApplication.update -= RepaintIfNeeded;
         }
 
@@ -74,7 +74,7 @@ namespace LocalMCP
 
         private void OnGUI()
         {
-            var isRunning = MCPServer.IsRunning;
+            var isRunning = LocalMCPServer.IsRunning;
             var isCompiling = EditorApplication.isCompiling;
 
             // Header status bar
@@ -103,18 +103,18 @@ namespace LocalMCP
                 if (GUILayout.Button("Start", GUILayout.Height(28)))
                 {
                     EditorPrefs.SetInt("LocalMCP_Port", _port);
-                    MCPServer.Start(_port);
+                    LocalMCPServer.Start(_port);
                 }
             }
             else
             {
                 if (GUILayout.Button("Stop", GUILayout.Height(28)))
                 {
-                    MCPServer.Stop();
+                    LocalMCPServer.Stop();
                 }
                 if (GUILayout.Button("Restart", GUILayout.Height(28)))
                 {
-                    MCPServer.Restart();
+                    LocalMCPServer.Restart();
                 }
             }
 
@@ -186,7 +186,7 @@ namespace LocalMCP
             else if (isRunning)
             {
                 bgColor = new Color(0.1f, 0.4f, 0.15f);
-                statusText = $"RUNNING on :{MCPServer.Port} - {MCPServer.ToolCount} tools";
+                statusText = $"RUNNING on :{LocalMCPServer.Port} - {LocalMCPServer.ToolCount} tools";
             }
             else
             {
@@ -223,7 +223,7 @@ namespace LocalMCP
 
         private void TestConnection()
         {
-            if (!MCPServer.IsRunning)
+            if (!LocalMCPServer.IsRunning)
             {
                 ShowNotification(new GUIContent("Server not running"), 1.5f);
                 return;
@@ -231,7 +231,7 @@ namespace LocalMCP
 
             try
             {
-                var request = System.Net.WebRequest.Create($"http://localhost:{MCPServer.Port}/");
+                var request = System.Net.WebRequest.Create($"http://localhost:{LocalMCPServer.Port}/");
                 request.Timeout = 2000;
                 using var response = request.GetResponse();
                 ShowNotification(new GUIContent("Connection OK!"), 1.5f);

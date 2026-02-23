@@ -1,4 +1,4 @@
-using System.IO;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -106,49 +106,6 @@ namespace LocalMCP.Tools
 
             sv.FrameSelected();
             return new { success = true, message = $"Framed: {Selection.activeGameObject.name}" };
-        }
-
-        [MCPTool("ping_asset", "Ping (highlight) an asset in the Project window")]
-        [MCPParam("path", "string", "Asset path to ping")]
-        public static object PingAsset(JObject args)
-        {
-            var path = args["path"]?.ToString();
-            if (string.IsNullOrEmpty(path))
-            {
-                return new { success = false, message = "Path required" };
-            }
-
-            var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-            if (asset == null)
-            {
-                return new { success = false, message = $"Asset not found: {path}" };
-            }
-
-            EditorGUIUtility.PingObject(asset);
-            return new { success = true, message = $"Pinged: {path}" };
-        }
-
-        [MCPTool("open_script", "Open a script file in the default IDE")]
-        [MCPParam("path", "string", "Script asset path")]
-        [MCPParam("line", "integer", "Line number to jump to (default: 1)", false)]
-        public static object OpenScript(JObject args)
-        {
-            var path = args["path"]?.ToString();
-            var line = args["line"]?.ToObject<int>() ?? 1;
-
-            if (string.IsNullOrEmpty(path))
-            {
-                return new { success = false, message = "Path required" };
-            }
-
-            var script = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-            if (script == null)
-            {
-                return new { success = false, message = $"Script not found: {path}" };
-            }
-
-            AssetDatabase.OpenAsset(script, line);
-            return new { success = true, message = $"Opened: {path} at line {line}" };
         }
     }
 }

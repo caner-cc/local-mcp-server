@@ -19,7 +19,7 @@ namespace LocalMCP
     /// This ensures the server is online even when Unity is unfocused.
     /// Request processing waits for Unity's main thread, but connections
     /// are accepted immediately so clients don't get "connection refused".
-    ///
+    /// 
     /// Safety features:
     /// - Request queue size limit (prevents memory growth during hangs)
     /// - Reduced request timeout (10s instead of 30s)
@@ -27,7 +27,7 @@ namespace LocalMCP
     /// - Response size truncation
     /// </summary>
     [InitializeOnLoad]
-    public static class MCPServer
+    public static class LocalMCPServer
     {
         private static HttpListener _listener;
         private static Thread _listenerThread;
@@ -55,7 +55,7 @@ namespace LocalMCP
 
         public static int Port { get; private set; } = 8090;
         public static int QueuedRequests { get { lock (_lock) { return _pendingRequests.Count; } } }
-
+        
         /// <summary>
         /// Force stop all MCP operations. Use when Unity is hung or unresponsive.
         /// This clears the request queue and stops the server.
@@ -64,7 +64,7 @@ namespace LocalMCP
         public static void ForceStop()
         {
             Debug.LogWarning("[LocalMCP] Force stop initiated - clearing all pending requests");
-
+            
             // Clear all pending requests immediately
             lock (_lock)
             {
@@ -78,13 +78,13 @@ namespace LocalMCP
                     catch { }
                 }
             }
-
+            
             // Stop the server
             StopInternal(preserveAutoStart: false);
-
+            
             Debug.Log("[LocalMCP] Force stop completed. Server stopped and queue cleared.");
         }
-
+        
         /// <summary>
         /// Clear the request queue without stopping the server.
         /// Use when requests are piling up but you want to keep the server running.
@@ -105,12 +105,12 @@ namespace LocalMCP
                     cleared++;
                 }
             }
-
+            
             if (cleared > 0)
             {
                 Debug.LogWarning($"[LocalMCP] Cleared {cleared} pending requests from queue");
             }
-
+            
             return cleared;
         }
         public static bool IsRunning => _running && _listener != null && _listener.IsListening;
@@ -119,7 +119,7 @@ namespace LocalMCP
         public static event Action OnServerStarted;
         public static event Action OnServerStopped;
 
-        static MCPServer()
+        static LocalMCPServer()
         {
             // Register for Unity callbacks
             EditorApplication.update += ProcessPendingRequests;
@@ -139,7 +139,7 @@ namespace LocalMCP
         private static void OnCompilationStarted(object obj)
         {
             _isCompiling = true;
-
+            
             // Clear ALL pending requests immediately - they will time out gracefully
             // This prevents the "waiting for user code" hang
             lock (_lock)
@@ -150,7 +150,7 @@ namespace LocalMCP
                     pending.CompletionEvent.Set(); // Release waiting HTTP thread
                 }
             }
-
+            
             // Don't stop the server - just mark as compiling
             // The HTTP listener stays up to accept connections, but returns "compiling" errors
         }
@@ -159,10 +159,10 @@ namespace LocalMCP
         {
             _isCompiling = false;
             _domainReloadCount++; // Increment to invalidate any stale requests
-
+            
             // Re-initialize tools after compilation (domain reload resets everything)
             _serverInitialized = false;
-
+            
             // If server is still running (listener survived), just reinitialize tools
             if (IsRunning)
             {
@@ -185,8 +185,8 @@ namespace LocalMCP
             if (_running) return;
 
             // Try primary port, then fallback ports
-            int[] portsToTry = port == 8090
-                ? new[] { 8090, 8091, 8092 }
+            int[] portsToTry = port == 8090 
+                ? new[] { 8090, 8091, 8092 } 
                 : new[] { port };
 
             foreach (int tryPort in portsToTry)
@@ -223,7 +223,7 @@ namespace LocalMCP
                 {
                     _listener?.Close();
                     _listener = null;
-
+                    
                     // If this was the last port to try, log the error
                     if (tryPort == portsToTry[portsToTry.Length - 1])
                     {
@@ -326,7 +326,7 @@ namespace LocalMCP
                 try
                 {
                     var context = _listener.GetContext();
-
+                    
                     // If compiling, return immediately with status
                     if (_isCompiling)
                     {
@@ -342,14 +342,14 @@ namespace LocalMCP
                         catch { }
                         continue;
                     }
-
+                    
                     // Check queue size limit - reject if full
                     int currentQueueSize;
                     lock (_lock)
                     {
                         currentQueueSize = _pendingRequests.Count;
                     }
-
+                    
                     if (currentQueueSize >= MaxQueueSize)
                     {
                         try
@@ -364,9 +364,9 @@ namespace LocalMCP
                         catch { }
                         continue;
                     }
-
-                    var pending = new PendingRequest
-                    {
+                    
+                    var pending = new PendingRequest 
+                    { 
                         Context = context,
                         DomainReloadId = _domainReloadCount
                     };
@@ -408,7 +408,7 @@ namespace LocalMCP
         private static void ProcessPendingRequests()
         {
             if (!_running) return;
-
+            
             // Don't process requests while compiling - they'll be rejected in ListenLoop
             if (_isCompiling) return;
 
@@ -429,7 +429,7 @@ namespace LocalMCP
                 }
 
                 if (pending == null) break;
-
+                
                 // Skip stale requests from before domain reload
                 if (pending.DomainReloadId != _domainReloadCount)
                 {
@@ -437,7 +437,7 @@ namespace LocalMCP
                     processed++;
                     continue;
                 }
-
+                
                 // Skip requests that are too old (stale after domain reload)
                 if ((DateTime.UtcNow - pending.CreatedAt).TotalSeconds > StaleRequestAgeSeconds)
                 {
@@ -534,10 +534,10 @@ namespace LocalMCP
             var hasErrors = EditorUtility.scriptCompilationFailed;
             var isPlaying = EditorApplication.isPlaying;
             var isPaused = EditorApplication.isPaused;
-
+            
             // Calculate readiness score
             bool ready = _serverInitialized && !isCompiling && !hasErrors;
-
+            
             SendJson(response, new
             {
                 ready,
@@ -664,7 +664,7 @@ namespace LocalMCP
             {
                 var result = MCPToolRegistry.InvokeTool(toolName, arguments);
                 var resultJson = JsonConvert.SerializeObject(result, Formatting.Indented);
-
+                
                 // Truncate large responses to prevent memory issues
                 if (resultJson.Length > MaxResponseSizeBytes)
                 {
@@ -680,7 +680,7 @@ namespace LocalMCP
                     resultJson = JsonConvert.SerializeObject(truncatedResult, Formatting.Indented);
                     Debug.LogWarning($"[LocalMCP] Response for {toolName} truncated: {resultJson.Length} > {MaxResponseSizeBytes} bytes");
                 }
-
+                
                 return new { content = new[] { new { type = "text", text = resultJson } } };
             }
             catch (Exception e)

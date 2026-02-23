@@ -266,43 +266,191 @@ namespace LocalMCP.Tools
             return new { success = true, message = $"Deleted: {path}" };
         }
 
-        [MCPTool("hierarchy_tree", "Get the full scene hierarchy as a tree")]
-        [MCPParam("maxDepth", "integer", "Maximum depth to traverse (default: 10)", false)]
+        [MCPTool("component_add", "Add a component to a GameObject")]
+        [MCPParam("path", "string", "Hierarchy path to the GameObject")]
+        [MCPParam("component", "string", "Component type name (e.g., 'Rigidbody', 'BoxCollider')")]
+        public static object ComponentAdd(JObject args)
+        {
+            var path = args["path"]?.ToString();
+            var componentName = args["component"]?.ToString();
+
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(componentName))
+            {
+                return new { success = false, message = "Path and component required" };
+            }
+
+            var go = GameObject.Find(path);
+            if (go == null)
+            {
+                return new { success = false, message = $"GameObject not found: {path}" };
+            }
+
+            // Find the component type
+            Type componentType = null;
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                componentType = assembly.GetTypes()
+                    .FirstOrDefault(t => t.Name == componentName && typeof(Component).IsAssignableFrom(t));
+                if (componentType != null) break;
+            }
+
+            if (componentType == null)
+            {
+                return new { success = false, message = $"Component type not found: {componentName}" };
+            }
+
+            var component = Undo.AddComponent(go, componentType);
+            return new
+            {
+                success = component != null,
+                message = component != null ? $"Added {componentName} to {go.name}" : "Failed to add component"
+            };
+        }
+
+        [MCPTool("component_remove", "Remove a component from a GameObject")]
+        [MCPParam("path", "string", "Hierarchy path to the GameObject")]
+        [MCPParam("component", "string", "Component type name to remove")]
+        public static object ComponentRemove(JObject args)
+        {
+            var path = args["path"]?.ToString();
+            var componentName = args["component"]?.ToString();
+
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(componentName))
+            {
+                return new { success = false, message = "Path and component required" };
+            }
+
+            var go = GameObject.Find(path);
+            if (go == null)
+            {
+                return new { success = false, message = $"GameObject not found: {path}" };
+            }
+
+            var component = go.GetComponents<Component>()
+                .FirstOrDefault(c => c != null && c.GetType().Name == componentName);
+
+            if (component == null)
+            {
+                return new { success = false, message = $"Component not found: {componentName}" };
+            }
+
+            if (component is Transform)
+            {
+                return new { success = false, message = "Cannot remove Transform component" };
+            }
+
+            Undo.DestroyObjectImmediate(component);
+            return new { success = true, message = $"Removed {componentName} from {go.name}" };
+        }
+
+        [MCPTool("hierarchy_tree", "Get scene hierarchy as a tree (use smaller depth to reduce output)")]
+        [MCPParam("maxDepth", "integer", "Max depth (default: 3, use 1-2 for overview)", false)]
+        [MCPParam("maxChildren", "integer", "Max children per node (default: 20)", false)]
+        [MCPParam("skipInactive", "boolean", "Skip inactive objects (default: false)", false)]
+        [MCPParam("root", "string", "Start from specific path instead of scene root", false)]
         public static object HierarchyTree(JObject args)
         {
-            var maxDepth = args["maxDepth"]?.ToObject<int>() ?? 10;
-            var scene = SceneManager.GetActiveScene();
-            var roots = scene.GetRootGameObjects();
+            var maxDepth = args["maxDepth"]?.ToObject<int>() ?? 3;
+            var maxChildren = args["maxChildren"]?.ToObject<int>() ?? 20;
+            var skipInactive = args["skipInactive"]?.ToObject<bool>() ?? false;
+            var rootPath = args["root"]?.ToString();
 
-            var tree = roots.Select(r => BuildTreeNode(r, 0, maxDepth)).ToArray();
+            var scene = SceneManager.GetActiveScene();
+            var stats = new TreeStats();
+
+            IEnumerable<GameObject> roots;
+            if (!string.IsNullOrEmpty(rootPath))
+            {
+                var rootGo = GameObject.Find(rootPath);
+                if (rootGo == null)
+                    return new { success = false, error = $"Root not found: {rootPath}" };
+                roots = new[] { rootGo };
+            }
+            else
+            {
+                roots = scene.GetRootGameObjects();
+            }
+
+            var tree = roots
+                .Where(r => !skipInactive || r.activeSelf)
+                .Select(r => BuildTreeNode(r, 0, maxDepth, maxChildren, skipInactive, stats))
+                .Where(n => n != null)
+                .ToArray();
 
             return new
             {
                 scene = scene.name,
-                tree
+                tree,
+                stats = new
+                {
+                    nodesReturned = stats.NodesReturned,
+                    childrenTruncated = stats.ChildrenTruncated,
+                    depthTruncated = stats.DepthTruncated,
+                    hint = stats.ChildrenTruncated > 0 || stats.DepthTruncated > 0
+                        ? "Use 'root' param to drill into specific objects"
+                        : null
+                }
             };
         }
 
-        private static object BuildTreeNode(GameObject go, int depth, int maxDepth)
+        private class TreeStats
         {
+            public int NodesReturned;
+            public int ChildrenTruncated;
+            public int DepthTruncated;
+        }
+
+        private static object BuildTreeNode(GameObject go, int depth, int maxDepth, int maxChildren, bool skipInactive, TreeStats stats)
+        {
+            if (skipInactive && !go.activeSelf)
+                return null;
+
+            stats.NodesReturned++;
             var children = new List<object>();
+            int truncatedCount = 0;
+
             if (depth < maxDepth)
             {
+                int childCount = 0;
                 for (int i = 0; i < go.transform.childCount; i++)
                 {
-                    children.Add(BuildTreeNode(go.transform.GetChild(i).gameObject, depth + 1, maxDepth));
+                    var child = go.transform.GetChild(i).gameObject;
+                    if (skipInactive && !child.activeSelf)
+                        continue;
+
+                    if (childCount >= maxChildren)
+                    {
+                        truncatedCount++;
+                        continue;
+                    }
+
+                    var node = BuildTreeNode(child, depth + 1, maxDepth, maxChildren, skipInactive, stats);
+                    if (node != null)
+                    {
+                        children.Add(node);
+                        childCount++;
+                    }
                 }
+
+                if (truncatedCount > 0)
+                    stats.ChildrenTruncated += truncatedCount;
+            }
+            else if (go.transform.childCount > 0)
+            {
+                stats.DepthTruncated++;
             }
 
             return new
             {
                 name = go.name,
                 active = go.activeSelf,
+                childCount = go.transform.childCount,
                 components = go.GetComponents<Component>()
                     .Where(c => c != null && !(c is Transform))
                     .Select(c => c.GetType().Name)
                     .ToArray(),
-                children = children.Count > 0 ? children : null
+                children = children.Count > 0 ? children : null,
+                truncated = truncatedCount > 0 ? $"+{truncatedCount} more" : null
             };
         }
 

@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -11,12 +14,15 @@ namespace LocalMCP
 {
     /// <summary>
     /// Discovers and manages MCP tools via reflection.
-    /// Includes timeout protection and watchdog logging for slow tools.
+    /// Includes timeout protection, watchdog logging, and category filtering.
     /// </summary>
     public static class MCPToolRegistry
     {
         private static Dictionary<string, ToolInfo> _tools;
+        private static HashSet<string> _disabledCategories;
         private static bool _initialized;
+
+        private const string DisabledCategoriesKey = "LocalMCP_DisabledCategories";
 
         /// <summary>
         /// Maximum time a tool can run before being considered "slow" (for logging).
@@ -46,6 +52,7 @@ namespace LocalMCP
         {
             public string Name;
             public string Description;
+            public string Category;
             public MethodInfo Method;
             public List<ParamInfo> Parameters = new();
         }
@@ -56,6 +63,91 @@ namespace LocalMCP
             public string Type;
             public string Description;
             public bool Required;
+        }
+
+        /// <summary>
+        /// Load disabled categories from EditorPrefs.
+        /// </summary>
+        private static void LoadDisabledCategories()
+        {
+            _disabledCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var saved = EditorPrefs.GetString(DisabledCategoriesKey, "Environment,Town");
+            if (!string.IsNullOrEmpty(saved))
+            {
+                foreach (var cat in saved.Split(','))
+                {
+                    if (!string.IsNullOrWhiteSpace(cat))
+                        _disabledCategories.Add(cat.Trim());
+                }
+            }
+        }
+
+        /// <summary>
+        /// Save disabled categories to EditorPrefs.
+        /// </summary>
+        private static void SaveDisabledCategories()
+        {
+            EditorPrefs.SetString(DisabledCategoriesKey, string.Join(",", _disabledCategories));
+        }
+
+        /// <summary>
+        /// Check if a category is disabled.
+        /// </summary>
+        public static bool IsCategoryDisabled(string category)
+        {
+            if (_disabledCategories == null) LoadDisabledCategories();
+            return _disabledCategories.Contains(category);
+        }
+
+        /// <summary>
+        /// Enable or disable a category of tools.
+        /// </summary>
+        public static void SetCategoryEnabled(string category, bool enabled)
+        {
+            if (_disabledCategories == null) LoadDisabledCategories();
+
+            if (enabled)
+                _disabledCategories.Remove(category);
+            else
+                _disabledCategories.Add(category);
+
+            SaveDisabledCategories();
+            Debug.Log($"[LocalMCP] Category '{category}' {(enabled ? "enabled" : "disabled")}");
+        }
+
+        /// <summary>
+        /// Get all known categories and their enabled state.
+        /// </summary>
+        public static Dictionary<string, bool> GetCategories()
+        {
+            EnsureInitialized();
+            if (_disabledCategories == null) LoadDisabledCategories();
+
+            var categories = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            foreach (var tool in _tools.Values)
+            {
+                if (!categories.ContainsKey(tool.Category))
+                {
+                    categories[tool.Category] = !_disabledCategories.Contains(tool.Category);
+                }
+            }
+            return categories;
+        }
+
+        /// <summary>
+        /// Get count of tools per category.
+        /// </summary>
+        public static Dictionary<string, int> GetCategoryCounts()
+        {
+            EnsureInitialized();
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var tool in _tools.Values)
+            {
+                if (!counts.ContainsKey(tool.Category))
+                    counts[tool.Category] = 0;
+                counts[tool.Category]++;
+            }
+            return counts;
         }
 
         private static void EnsureInitialized()
@@ -107,6 +199,7 @@ namespace LocalMCP
                     {
                         Name = toolAttr.Name,
                         Description = toolAttr.Description,
+                        Category = toolAttr.Category ?? "General",
                         Method = method
                     };
 
@@ -136,27 +229,44 @@ namespace LocalMCP
         public static string[] GetToolNames()
         {
             EnsureInitialized();
+            if (_disabledCategories == null) LoadDisabledCategories();
+
+            return _tools.Values
+                .Where(t => !_disabledCategories.Contains(t.Category))
+                .Select(t => t.Name)
+                .ToArray();
+        }
+
+        /// <summary>
+        /// Get all tool names including disabled categories.
+        /// </summary>
+        public static string[] GetAllToolNames()
+        {
+            EnsureInitialized();
             return _tools.Keys.ToArray();
         }
 
         public static object[] GetToolDefinitions()
         {
             EnsureInitialized();
+            if (_disabledCategories == null) LoadDisabledCategories();
 
-            return _tools.Values.Select(t => new
-            {
-                name = t.Name,
-                description = t.Description,
-                inputSchema = new
+            return _tools.Values
+                .Where(t => !_disabledCategories.Contains(t.Category))
+                .Select(t => new
                 {
-                    type = "object",
-                    properties = t.Parameters.ToDictionary(
-                        p => p.Name,
-                        p => BuildPropertySchema(p)
-                    ),
-                    required = t.Parameters.Where(p => p.Required).Select(p => p.Name).ToArray()
-                }
-            }).ToArray();
+                    name = t.Name,
+                    description = t.Description,
+                    inputSchema = new
+                    {
+                        type = "object",
+                        properties = t.Parameters.ToDictionary(
+                            p => p.Name,
+                            p => BuildPropertySchema(p)
+                        ),
+                        required = t.Parameters.Where(p => p.Required).Select(p => p.Name).ToArray()
+                    }
+                }).ToArray();
         }
 
         private static object BuildPropertySchema(ParamInfo p)
@@ -179,8 +289,8 @@ namespace LocalMCP
             }
 
             // Determine timeout based on tool type
-            int timeoutMs = CompilationTools.Contains(name)
-                ? CompilationToolTimeoutMs
+            int timeoutMs = CompilationTools.Contains(name) 
+                ? CompilationToolTimeoutMs 
                 : DefaultToolTimeoutMs;
 
             var stopwatch = Stopwatch.StartNew();
@@ -237,8 +347,8 @@ namespace LocalMCP
         /// </summary>
         public static int GetToolTimeout(string toolName)
         {
-            return CompilationTools.Contains(toolName)
-                ? CompilationToolTimeoutMs
+            return CompilationTools.Contains(toolName) 
+                ? CompilationToolTimeoutMs 
                 : DefaultToolTimeoutMs;
         }
     }

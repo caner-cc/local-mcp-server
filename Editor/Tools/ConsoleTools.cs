@@ -24,6 +24,21 @@ namespace LocalMCP.Tools
         private static bool _editorFocused = true;
         private static bool _silentModeWhenUnfocused = true; // Skip non-error logs when unfocused
 
+        /// <summary>
+        /// When true, only errors/exceptions are buffered when the editor is unfocused.
+        /// This dramatically reduces overhead when returning to Unity after long sessions.
+        /// </summary>
+        public static bool SilentModeWhenUnfocused
+        {
+            get => _silentModeWhenUnfocused;
+            set => _silentModeWhenUnfocused = value;
+        }
+
+        /// <summary>
+        /// Returns true if the editor currently has focus.
+        /// </summary>
+        public static bool EditorHasFocus => _editorFocused;
+
         private class LogEntry
         {
             public string Message;
@@ -198,5 +213,6 @@ namespace LocalMCP.Tools
                 return new { success = false, message = $"Buffer cleared, but failed to clear Unity console: {e.Message}" };
             }
         }
+
     }
 }

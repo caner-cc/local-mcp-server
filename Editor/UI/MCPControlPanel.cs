@@ -17,7 +17,7 @@ namespace LocalMCP
         private GUIStyle _commandStyle;
         private Vector2 _scrollPos;
 
-        [MenuItem("Tools/MCP/Control Panel", priority = 0)]
+        [MenuItem("Tools/MCP Control Panel", priority = 0)]
         public static void ShowWindow()
         {
             var window = GetWindow<MCPControlPanel>("MCP Control");
@@ -102,10 +102,10 @@ namespace LocalMCP
             EditorGUILayout.LabelField("Emergency Controls", EditorStyles.boldLabel);
             EditorGUILayout.BeginVertical(_statusStyle);
 
-            int queuedRequests = MCPServer.QueuedRequests;
-
+            int queuedRequests = LocalMCPServer.QueuedRequests;
+            
             EditorGUILayout.LabelField("Queued Requests:", queuedRequests.ToString());
-
+            
             if (queuedRequests > 5)
             {
                 EditorGUILayout.HelpBox(
@@ -117,24 +117,24 @@ namespace LocalMCP
             EditorGUILayout.Space(5);
 
             EditorGUILayout.BeginHorizontal();
-
+            
             if (GUILayout.Button("Clear Queue", GUILayout.Height(25)))
             {
-                int cleared = MCPServer.ClearRequestQueue();
+                int cleared = LocalMCPServer.ClearRequestQueue();
                 Debug.Log($"[MCP] Cleared {cleared} queued requests");
             }
-
+            
             GUI.backgroundColor = new Color(0.9f, 0.4f, 0.4f);
             if (GUILayout.Button("Force Stop MCP", GUILayout.Height(25)))
             {
-                MCPServer.ForceStop();
+                LocalMCPServer.ForceStop();
             }
             GUI.backgroundColor = Color.white;
-
+            
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(5);
-
+            
             EditorGUILayout.HelpBox(
                 "If Unity hangs frequently, try:\n" +
                 "1. Use 'Clear Queue' to drop pending requests\n" +
@@ -148,9 +148,9 @@ namespace LocalMCP
 
         private void DrawMCPSection()
         {
-            bool running = MCPServer.IsRunning;
-            int port = MCPServer.Port;
-            int tools = MCPServer.ToolCount;
+            bool running = LocalMCPServer.IsRunning;
+            int port = LocalMCPServer.Port;
+            int tools = LocalMCPServer.ToolCount;
 
             // Header with status indicator
             EditorGUILayout.BeginHorizontal();
@@ -181,7 +181,7 @@ namespace LocalMCP
             if (running)
             {
                 EditorGUILayout.HelpBox(
-                    "Tool Categories: Assets, Scene, Inspector, SceneView, Debug, Console, Editor, Agentic",
+                    "Tool Categories: Assets, Scene, Inspector, Animation, SceneView, Debug, Console, Editor, Agentic, Tests",
                     MessageType.Info);
             }
 
@@ -193,11 +193,11 @@ namespace LocalMCP
             {
                 if (GUILayout.Button("Stop", GUILayout.Height(25)))
                 {
-                    MCPServer.Stop();
+                    LocalMCPServer.Stop();
                 }
                 if (GUILayout.Button("Restart", GUILayout.Height(25)))
                 {
-                    MCPServer.Restart();
+                    LocalMCPServer.Restart();
                 }
             }
             else
@@ -205,7 +205,7 @@ namespace LocalMCP
                 if (GUILayout.Button("Start", GUILayout.Height(25)))
                 {
                     MCPToolRegistry.Refresh();
-                    MCPServer.Start();
+                    LocalMCPServer.Start();
                 }
             }
 
@@ -221,7 +221,7 @@ namespace LocalMCP
             EditorGUILayout.BeginVertical(_statusStyle);
 
             var stats = AssetCache.Instance.GetStats();
-
+            
             // Use reflection to get stats values safely
             var statsType = stats.GetType();
             var totalAssets = statsType.GetProperty("totalAssets")?.GetValue(stats);
